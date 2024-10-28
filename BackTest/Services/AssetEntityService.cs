@@ -10,6 +10,8 @@ public interface IAssetEntityService
     Task CreateEntityAsync(AssetEntity entity);
     Task UpdateEntityAsync(Guid id, AssetEntity updatedEntity);
     Task DeleteEntityAsync(Guid id);
+    Task<IEnumerable<Relationship>> GetIndirectRelationshipsAsync(Guid entityId, int depth);
+    Task CreateOrUpdateRelationshipAsync(Relationship relationship);
 }
 
 public class AssetEntityService : IAssetEntityService
@@ -55,5 +57,47 @@ public class AssetEntityService : IAssetEntityService
     public async Task DeleteEntityAsync(Guid id)
     {
         await _repository.DeleteAsync(id);
+    }
+
+    public async Task<IEnumerable<Relationship>> GetIndirectRelationshipsAsync(Guid entityId, int depth)
+    {
+        return await _repository.GetIndirectRelationshipsAsync(entityId, depth);
+    }
+
+    public async Task CreateOrUpdateRelationshipAsync(Relationship relationship)
+    {
+        var existingRelationship = await _repository.GetRelationshipByIdAsync(relationship.Relationship_Id);
+        if (existingRelationship == null)
+        {
+            // Ensure that there are no circular dependencies before creating
+            var hasCircularDependency = await CheckCircularRelationshipAsync(relationship.SourceEntity_Id, relationship.TargetEntity_Id);
+            if (hasCircularDependency)
+            {
+                throw new InvalidOperationException("Circular relationship detected.");
+            }
+
+            await _repository.CreateRelationship(relationship);
+        }
+        else
+        {
+            existingRelationship.RelationshipType = relationship.RelationshipType;
+            existingRelationship.Role = relationship.Role;
+            existingRelationship.IsBidirectional = relationship.IsBidirectional;
+            existingRelationship.UpdatedAt = DateTime.UtcNow;
+            existingRelationship.AdditionalMetadata = relationship.AdditionalMetadata;
+
+            await _repository.UpdateRelationship(existingRelationship);
+        }
+    }
+
+    private async Task<bool> CheckCircularRelationshipAsync(Guid sourceEntityId, Guid targetEntityId)
+    {
+        var relationships = await _repository.GetRelationshipsByEntityIdAsync(sourceEntityId);
+        return relationships.Any(r => r.TargetEntity_Id == targetEntityId || r.SourceEntity_Id == targetEntityId);
+    }
+
+    public async Task<Relationship?> GetRelationshipByIdAsync(Guid relationshipId)
+    {
+        return await _repository.GetRelationshipByIdAsync(relationshipId);
     }
 }

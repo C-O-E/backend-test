@@ -102,6 +102,14 @@ public class Relationship
 
     public Guid TargetEntity_Id { get; set; }
     public virtual required AssetEntity TargetEntity { get; set; }
+    public bool IsBidirectional { get; set; } = true;
+    public string? AdditionalMetadata { get; set; }
+
+    [Required]
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; }
+    public DateTime? DeletedAt { get; set; }
+    public bool IsUnderReview { get; set; } = false;
 }
 
 // Represents entity positions for visual representation.
