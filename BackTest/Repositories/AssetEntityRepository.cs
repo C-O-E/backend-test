@@ -1,4 +1,4 @@
-﻿using BackTest.Models;
+using BackTest.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace BackTest.Repositories;
@@ -15,6 +15,10 @@ public interface IAssetEntityRepository
     Task<Relationship?> GetRelationshipByIdAsync(Guid relationshipId);
     Task CreateRelationship(Relationship relationship);
     Task UpdateRelationship(Relationship relationship);
+    Task DeleteRelationship(Guid relationshipId);
+    Task CreateOwnership(AssetOwnership ownership);
+    Task<IEnumerable<AssetOwnership>> GetOwnershipsByEntityIdAsync(Guid entityId);
+    Task<IEnumerable<AssetOwnership>> GetOwnershipsByAssetIdAsync(Guid assetId);
 }
 
 public class AssetEntityRepository : IAssetEntityRepository
@@ -67,9 +71,12 @@ public class AssetEntityRepository : IAssetEntityRepository
         {
             var relationships = await _context.Relationships
                 .Where(r => currentDepthEntities.Contains(r.SourceEntity_Id) || currentDepthEntities.Contains(r.TargetEntity_Id))
+                .Include(r => r.SourceEntity)
+                .Include(r => r.TargetEntity)
                 .ToListAsync();
 
             indirectRelationships.AddRange(relationships);
+
             currentDepthEntities = relationships.Select(r => r.TargetEntity_Id).Distinct().ToList();
         }
 
@@ -80,6 +87,8 @@ public class AssetEntityRepository : IAssetEntityRepository
     {
         return await _context.Relationships
             .Where(r => r.SourceEntity_Id == entityId || r.TargetEntity_Id == entityId)
+            .Include(r => r.SourceEntity)
+            .Include(r => r.TargetEntity)
             .ToListAsync();
     }
 
@@ -100,4 +109,35 @@ public class AssetEntityRepository : IAssetEntityRepository
         await _context.SaveChangesAsync();
     }
 
+    public async Task DeleteRelationship(Guid relationshipId)
+    {
+        var relationship = await _context.Relationships.FindAsync(relationshipId);
+        if (relationship != null)
+        {
+            _context.Relationships.Remove(relationship);
+            await _context.SaveChangesAsync();
+        }
+    }
+
+    public async Task CreateOwnership(AssetOwnership ownership)
+    {
+        await _context.AssetOwnerships.AddAsync(ownership);
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task<IEnumerable<AssetOwnership>> GetOwnershipsByEntityIdAsync(Guid entityId)
+    {
+        return await _context.AssetOwnerships
+            .Where(o => o.Entity_Id == entityId)
+            .Include(o => o.Asset)
+            .ToListAsync();
+    }
+
+    public async Task<IEnumerable<AssetOwnership>> GetOwnershipsByAssetIdAsync(Guid assetId)
+    {
+        return await _context.AssetOwnerships
+            .Where(o => o.Asset_Id == assetId)
+            .Include(o => o.Entity)
+            .ToListAsync();
+    }
 }

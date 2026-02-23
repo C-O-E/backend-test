@@ -1,4 +1,4 @@
-﻿using BackTest.Models;
+using BackTest.Models;
 using BackTest.Repositories;
 
 namespace BackTest.Services;
@@ -50,6 +50,7 @@ public class AssetEntityService : IAssetEntityService
             existingEntity.Tags = updatedEntity.Tags;
             existingEntity.UpdatedAt = DateTime.UtcNow;
             existingEntity.IsUnderReview = updatedEntity.IsUnderReview;
+
             await _repository.UpdateAsync(existingEntity);
         }
     }
@@ -69,7 +70,6 @@ public class AssetEntityService : IAssetEntityService
         var existingRelationship = await _repository.GetRelationshipByIdAsync(relationship.Relationship_Id);
         if (existingRelationship == null)
         {
-            // Ensure that there are no circular dependencies before creating
             var hasCircularDependency = await CheckCircularRelationshipAsync(relationship.SourceEntity_Id, relationship.TargetEntity_Id);
             if (hasCircularDependency)
             {
@@ -99,5 +99,20 @@ public class AssetEntityService : IAssetEntityService
     public async Task<Relationship?> GetRelationshipByIdAsync(Guid relationshipId)
     {
         return await _repository.GetRelationshipByIdAsync(relationshipId);
+    }
+
+    public async Task DeleteRelationshipAsync(Guid relationshipId)
+    {
+        await _repository.DeleteRelationship(relationshipId);
+    }
+
+    public async Task CreateOwnershipAsync(AssetOwnership ownership)
+    {
+        await _repository.CreateOwnership(ownership);
+    }
+
+    public async Task<IEnumerable<AssetOwnership>> GetOwnershipsByEntityIdAsync(Guid entityId)
+    {
+        return await _repository.GetOwnershipsByEntityIdAsync(entityId);
     }
 }

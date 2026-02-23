@@ -1,112 +1,114 @@
-# Asset Management System README
+# Backend Developer Technical Assessment
 
-## Overview
+**Time guideline**: This assessment is designed for approximately **2-3 hours of work**. Focus on quality over quantity.
 
-This project is an Asset Management System developed as a C# Web API using .NET 8. It includes the ability to manage various asset entities, such as legal and natural persons, as well as concrete assets like real estate, stocks, and intellectual property.
+## Submission
 
-The system is designed to help you understand and manage complex relationships between entities, assets, and the metadata associated with them. The project also integrates various practices to ensure data consistency, business logic encapsulation, and a clean architecture using repositories, services, and controllers.
+1. Commit all your changes (code fixes, feature implementations, and written answers in this file)
+2. Push your branch
+3. Open a **Pull Request** to `main` with a brief summary of your work
 
-## Technical Overview
+## Context
 
-The project is composed of the following layers:
+You are joining a team that maintains a compliance and asset management platform. This API is a simple module that manages **asset entities** (legal entities, natural persons), their **relationships** (ownership, directorship, subsidiaries), and **asset ownerships**.
 
-- **Models** - Defines the data structure for asset entities (`AssetEntity`, `LegalEntity`, `NaturalEntity`), assets (`RealEstate`, `Stock`, `IPAsset`), and relationships between them.
-- **DbContext** - `AssetManagementDbContext` manages the database connection and handles the Entity Framework Core operations for the project.
-- **Repositories** - Handles the data access logic. The `AssetEntityRepository` performs CRUD operations for asset entities.
-- **Services** - Business logic layer. The `AssetEntityService` coordinates actions between controllers and the data access layer.
-- **Controllers** - Defines the Web API endpoints for managing asset entities via the `AssetEntityController`.
+The previous developer left the project in a broken state... Ohlala... Your job is to get it working, fix what you find, and most importanly *demonstrate* how you think. We would like a step-by-step walkthrough of your thought process as you explore the code, find issues, and implement features. Don't worry about perfection, we just want to see how you approach problems and make decisions.
 
-# Candidate Exam Questions
-## Part 1: Code Comprehension
-### Service and Repository Analysis
+## Getting Started
 
-- Review the provided `AssetEntityService` and `AssetEntityRepository` files.
-  - Explain the purpose of the `UpdateEntityAsync` method in the `AssetEntityService` and describe the key checks implemented before updating an entity.
-  - How would you modify this method to handle scenarios where certain fields should not be updated by default (e.g., `CreatedAt`, `EntityType`)?
+1. **Prerequisites**: .NET 8 SDK (or can be easily updated to 9 or 10 if you prefer) and any code editor (Visual Studio, VSCode, Rider, etc.)
+2. **Clone** this repository and create a new branch named `test/{your-name}` (e.g., `test/john-smith`)
+3. **Build**: `dotnet build`
+4. **Run**: `dotnet run --project BackTest`
+5. **Explore**: Swagger UI is available at the URL shown in the console output (`/swagger`)
 
-- Analyze the CreateOrUpdateRelationshipAsync method:
-  - Describe how circular relationships are prevented during the creation of a relationship.
-  - Explain the role of the CheckCircularRelationshipAsync method and how it ensures relationship integrity.
+(For 3 and 4 you can also use Visual Studio Debug Mode)
 
-### Model Relationships
+/!\ The application uses an **in-memory database** seeded with sample data on startup. Keep that in mind if your data tend to disappear after you restart the app.
 
-- Analyze the `AssetEntity`, `LegalEntity`, and `NaturalEntity` classes.
-  - Describe how inheritance is used to handle different entity types (legal and natural entities).
-  - How are relationships between entities managed in the data model? Provide an example of how a `Relationship` would be created between two entities.
+## Your Assignment
 
-## Part 2: Implementing New Features
-### Feature Development Task
+Work through the parts below in order! For each part, document your findings and reasoning directly in this file under the corresponding section (or in code comments). When you're done, commit your work and **open a Pull Request** back to `main`, there we'll review your changes.
 
-- Batch Update Risk Level:
-  - Add a new feature to the `AssetEntityService` that allows batch updating the risk level for multiple asset entities. The input should be a list of entity IDs and a risk level value. Consider:
-	- Adding a new service method `BatchUpdateRiskLevel`.
-	- Implementing the corresponding repository method to perform the bulk update using Entity Framework Core.
-	- Describe how you would ensure that the operation is safe in terms of concurrency.
+We value your **thought process and reasoning** more than having a perfectly working app. If you find an issue but don't have time to fix it, describe it and explain how you would fix it.
 
-- Indirect Relationships Query:
-  - Implement a feature in the `RelationshipService` that allows querying indirect relationships of an entity up to a certain depth.
-  - Write the method `GetIndirectRelationshipsAsync` to return indirect relationships up to a specified depth.
-  - Describe how to optimize these recursive queries for performance using Entity Framework.
+---
 
-### Entity Validation
+### Part 1: Exploration & Bug Fixing
 
-- Implement validation in `AssetEntityRepository` to ensure that:
-  - An `AssetEntity` cannot have the same `EntityReference` as an existing entity.
-  - Update the `AddAsync` and `UpdateAsync` methods to add these checks before persisting data to the database.
+Run the application and explore it using Swagger or any HTTP client (Postman, curl, etc.).
 
-## Part 3: Extending and Improving Existing Logic
-### Refactoring for Extensibility
-#### Refactor GetAllAsync for Pagination:
+**Tasks:**
+- List every issues you find (bugs, design problems, missing features, warnings)
+- Fix the ones you can within the time you have
+- For each issue, briefly explain: what's wrong, why it matters, and how you fixed it (or would fix it)
 
-- Refactor the `GetAllAsync` method in `AssetEntityRepository` to support pagination. Update the `AssetEntityController` to allow clients to request specific pages of asset entities with a given page size.
-  - Implement the changes in both the repository and controller.
-  - Consider performance and usability aspects of the pagination feature.
+**Write your findings here:**
 
-#### CheckCircularRelationshipAsync Refactoring:
+> *(Your answer)*
 
-- Refactor the `CheckCircularRelationshipAsync` method for scalability:
-  - Suggest changes to make this method efficient when there is a large number of relationships.
-  - Explain how to handle potential performance bottlenecks with graph-like data traversal.
+---
 
-### Data Integrity Improvement
-#### Delete Entity and Related Data:
+### Part 2: Feature Implementation
 
-- In the `DeleteEntityAsync` method of the `AssetEntityService`, ensure that all related `Relationships` and `Positions` are also deleted or handled appropriately when an entity is deleted.
-  - Describe how you would implement cascading deletes or how to handle orphaned records using Entity Framework Core.
+Pick **2** of the following features and implement them. For the ones you don't implement, briefly describe your approach.
 
-## Part 4: Debugging and Troubleshooting
-#### Concurrency Handling
+1. **Pagination**: The `GET /api/AssetEntity` endpoint to return all entities and add pagination support with query parameters.
 
-- Analyze the `AssetEntityService` and `AssetEntityRepository` classes:
-  - How would you ensure that the `UpdateEntityAsync` method is safe from concurrency issues if two clients try to update the same entity simultaneously?
-  - Suggest an approach to manage optimistic concurrency in this context.
-- Given the new `CreateOrUpdateRelationshipAsync` method, describe how you would implement optimistic concurrency control using Entity Framework's concurrency tokens.
+2. **Search/Filter**: Add a way to filter entities by `EntityType`, `RiskLevel`, or `Tags`.
 
-#### Bug Fixing
+3. **Ownership Validation**: When creating an `AssetOwnership`, validate that the total ownership percentage for a given asset does not exceed 100%.
 
-- Suppose you encounter a `NullReferenceException` in the `GetEntityByIdAsync` method of the `AssetEntityService` when certain related entities are missing.
-  - How would you modify the repository method to handle null values more gracefully?
-  - What changes would you make to the controller to ensure a consistent and user-friendly response?
+4. **Relationship Delete**: Add a `DELETE /api/AssetEntity/relationships/{id}` endpoint that properly handles soft-deletion.
 
-## Part 5: Testing and Integration (Optional)
-### Integration Task
-- Integrate the `AssetEntity` system with the relationship context to handle asset ownership hierarchies.
-  - Modify the `AssetEntityService` to include methods that retrieve all assets owned by entities linked via relationships.
-  - Write integration tests that validate ownership retrieval logic, ensuring that ownership propagates through relationship layers.
+**Write your approach/notes here:**
 
-### Testing Strategy
-- Describe your approach to unit and integration testing for the `RelationshipService`.
-  - What testing tools or frameworks would you use?
-  - Write a unit test for the `GetRelationshipByIdAsync` method that mocks dependencies and validates different outcomes (e.g., relationship found, relationship not found).
+> *(Your answer)*
 
-## Running the Application
-To run the application, follow these steps:
+---
 
-1. **Prerequisites**: Ensure you have .NET 8 SDK installed.
-2. **Build and Run**:
-   - Use the command `dotnet build` to build the application.
-   - Run the application using `dotnet run`.
-   - The application uses an in-memory database (`AssetManagementTestDb`) configured in `Program.cs` for easy testing.
-3. **API Testing**: You can test the API using Swagger, which is available at `https://localhost:{port}/swagger` when running the application in development mode.
+### Part 3: Architecture & Design Questions
 
-# Good luck!
+Answer the following questions with a small paragraph. You don't need to write code for these. There are no trick questions, again, it's only to dig through your brain.
+
+**Q1**: The application uses an in-memory database. What would change if you had to switch to a real database (SQL Server or IBM DB2)? What problems might appear that are currently hidden?
+
+> *(Your answer)*
+
+**Q2**: The `SaveChangesAsync` override in the DbContext handles soft-deletion and audit logging. What do you think about this approach? What would you change or improve?
+
+> *(Your answer)*
+
+**Q3**: The application has a `TenantResolutionMiddleware` that reads a tenant ID from the `X-Tenant-Id` HTTP header. Try calling the API with and without this header. What do you observe?
+
+> *(Your answer)*
+
+**Q4**: Look at the `GetIndirectRelationshipsAsync` method in the repository. It goes through entity relationships using a loop. What problems might or will happen if the dataset grows to millions of records? How would you improve it?
+
+> *(Your answer)*
+
+**Q5**: If you had to add a feature to track the **full history** of every changes made to relationships (who changed what, when, old value vs new value), how would you design it?
+
+> *(Your answer)*
+
+---
+
+### Part 4: Production Scenario
+
+You don't need to write code for these either, just explain how you would investigate and solve the problem.
+
+**Scenario A**: A user reports that when they update a LegalEntity's `LegalName` via `PUT /api/AssetEntity/{id}`, the response is `204 No Content` (success), but the name hasn't actually changed. The `UpdatedAt` timestamp IS updated. Walk through how you would debug this.
+
+> *(Your answer)*
+
+**Scenario B**: After deploying to production, you get reports that deleting an entity sometimes causes other, seemingly unrelated entities to "disappear" from the API. What could cause this?
+
+> *(Your answer)*
+
+**Scenario C**: A new developer adds a `Comment` entity to the project following the same patterns. They can save comments successfully, but when they query for them, the API always returns an empty list. What might be going on?
+
+> *(Your answer)*
+
+---
+
+Good luck!

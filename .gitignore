@@ -396,3 +396,6 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# Interview guide (interviewer only - do not push)
+INTERVIEW_GUIDE.md

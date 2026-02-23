@@ -1,9 +1,31 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace BackTest.Models;
 
+// Base class providing audit, soft-delete, and tenant fields
+public abstract class CommonBase
+{
+    public bool IsDeleted { get; set; } = false;
+    public bool IsActive { get; set; } = true;
+    public bool IsLocked { get; set; } = false;
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; }
+    public DateTime? DeletedAt { get; set; }
+
+    public string? CreatedBy { get; set; }
+    public string? UpdatedBy { get; set; }
+
+    // Multi-tenant support
+    public Guid? Tenant_Id { get; set; }
+}
+
 // Base entity that represents common features of entities that can interact with assets.
-public class AssetEntity
+[JsonDerivedType(typeof(LegalEntity), "legal")]
+[JsonDerivedType(typeof(NaturalEntity), "natural")]
+public class AssetEntity : CommonBase
 {
     [Key]
     public Guid Entity_Id { get; set; } = Guid.NewGuid();
@@ -13,18 +35,14 @@ public class AssetEntity
 
     [Required]
     public string EntityType { get; set; } = "Unknown"; // "legal" or "natural"
-    public string? RiskLevel { get; set; }
+    public string? RiskLevel { get; set; } // low, medium, high, critical
 
     public List<string>? Tags { get; set; }
 
-    [Required]
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime? UpdatedAt { get; set; }
-    public DateTime? DeletedAt { get; set; }
     public bool IsUnderReview { get; set; } = false;
 
-    public virtual ICollection<Relationship>? Relationships { get; set; } = [];
-    public virtual ICollection<EntityPosition>? Positions { get; set; } = [];
+    public virtual ICollection<Relationship> Relationships { get; set; } = [];
+    public virtual ICollection<EntityPosition> Positions { get; set; } = [];
 }
 
 // Represents a legal entity that can own assets.
@@ -33,7 +51,9 @@ public class LegalEntity : AssetEntity
     [Required]
     public string LegalName { get; set; } = "Required";
     public string? TradeName { get; set; }
-    public virtual ICollection<AssetOwnership>? OwnedAssets { get; set; } = [];
+    public string? RegistrationNumber { get; set; }
+    public string? Jurisdiction_Iso3 { get; set; }
+    public virtual ICollection<AssetOwnership> OwnedAssets { get; set; } = [];
 }
 
 // Represents a natural person that can own assets.
@@ -44,16 +64,23 @@ public class NaturalEntity : AssetEntity
     [Required]
     public required string LastName { get; set; }
     public DateTime? DateOfBirth { get; set; }
-    public virtual ICollection<AssetOwnership>? OwnedAssets { get; set; } = [];
+    public string? Nationality_Iso3 { get; set; }
+    public virtual ICollection<AssetOwnership> OwnedAssets { get; set; } = [];
 }
 
 // Abstract asset class
-public abstract class Asset
+[JsonDerivedType(typeof(RealEstate), "realEstate")]
+[JsonDerivedType(typeof(Stock), "stock")]
+[JsonDerivedType(typeof(IPAsset), "ipAsset")]
+public abstract class Asset : CommonBase
 {
     [Key]
     public Guid Asset_Id { get; set; } = Guid.NewGuid();
     public string? AssetName { get; set; }
     public required string AssetType { get; set; }
+    public decimal? EstimatedValue { get; set; }
+    [MaxLength(3)]
+    public string? Currency { get; set; }
 }
 
 // Concrete asset classes
@@ -78,7 +105,7 @@ public class IPAsset : Asset
 }
 
 // Represents ownership relationships between entities and assets.
-public class AssetOwnership
+public class AssetOwnership : CommonBase
 {
     [Key]
     public Guid Ownership_Id { get; set; } = Guid.NewGuid();
@@ -87,14 +114,15 @@ public class AssetOwnership
     public Guid Asset_Id { get; set; }
     public virtual required Asset Asset { get; set; }
     public float OwnershipPercentage { get; set; }
+    public DateTime? AcquisitionDate { get; set; }
 }
 
 // Relationships such as management, ownership, etc.
-public class Relationship
+public class Relationship : CommonBase
 {
     [Key]
     public Guid Relationship_Id { get; set; } = Guid.NewGuid();
-    public required string RelationshipType { get; set; }
+    public required string RelationshipType { get; set; } // ownership, management, directorship, partnership, subsidiary
     public string? Role { get; set; }
 
     public Guid SourceEntity_Id { get; set; }
@@ -105,10 +133,6 @@ public class Relationship
     public bool IsBidirectional { get; set; } = true;
     public string? AdditionalMetadata { get; set; }
 
-    [Required]
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime? UpdatedAt { get; set; }
-    public DateTime? DeletedAt { get; set; }
     public bool IsUnderReview { get; set; } = false;
 }
 
@@ -121,4 +145,34 @@ public class EntityPosition
     public float Y { get; set; }
     public Guid Entity_Id { get; set; }
     public virtual required AssetEntity Entity { get; set; }
+}
+
+// Tenant model for multi-tenancy
+public class Tenant
+{
+    [Key]
+    public Guid Tenant_Id { get; set; } = Guid.NewGuid();
+    [Required]
+    public required string TenantName { get; set; }
+    public string? TenantCode { get; set; }
+    public bool IsActive { get; set; } = true;
+    public Guid? ParentTenant_Id { get; set; }
+
+    [ForeignKey("ParentTenant_Id")]
+    public virtual Tenant? ParentTenant { get; set; }
+    public virtual ICollection<Tenant> ChildTenants { get; set; } = [];
+}
+
+// Audit log for tracking changes
+public class AuditLog
+{
+    [Key]
+    public Guid AuditLog_Id { get; set; } = Guid.NewGuid();
+    public required string EntityName { get; set; }
+    public required string EntityId { get; set; }
+    public required string Action { get; set; } // created, updated, deleted
+    public string? Changes { get; set; }
+    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+    public string? PerformedBy { get; set; }
+    public Guid? Tenant_Id { get; set; }
 }

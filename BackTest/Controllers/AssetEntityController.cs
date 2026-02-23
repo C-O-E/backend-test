@@ -2,7 +2,6 @@ using BackTest.Models;
 using BackTest.Services;
 using Microsoft.AspNetCore.Mvc;
 
-// Controllers for Asset Management API
 [Route("api/[controller]")]
 [ApiController]
 public class AssetEntityController : ControllerBase
@@ -27,7 +26,7 @@ public class AssetEntityController : ControllerBase
     public async Task<ActionResult<AssetEntity>> GetAssetEntity(Guid id)
     {
         var assetEntity = await _service.GetEntityByIdAsync(id);
-        return assetEntity == null ? (ActionResult<AssetEntity>)NotFound() : (ActionResult<AssetEntity>)Ok(assetEntity);
+        return assetEntity == null ? NotFound() : Ok(assetEntity);
     }
 
     // POST: api/AssetEntity
@@ -65,6 +64,43 @@ public class AssetEntityController : ControllerBase
             return NotFound();
         }
         await _service.DeleteEntityAsync(id);
+        return NoContent();
+    }
+
+    // GET: api/AssetEntity/{id}/relationships
+    [HttpGet("{id}/relationships")]
+    public async Task<ActionResult<IEnumerable<Relationship>>> GetRelationships(Guid id)
+    {
+        var entity = await _service.GetEntityByIdAsync(id);
+        if (entity == null) return NotFound();
+
+        var relationships = await _service.GetIndirectRelationshipsAsync(id, 1);
+        return Ok(relationships);
+    }
+
+    // GET: api/AssetEntity/{id}/relationships/indirect?depth=3
+    [HttpGet("{id}/relationships/indirect")]
+    public async Task<ActionResult<IEnumerable<Relationship>>> GetIndirectRelationships(Guid id, [FromQuery] int depth = 2)
+    {
+        var relationships = await _service.GetIndirectRelationshipsAsync(id, depth);
+        return Ok(relationships);
+    }
+
+    // POST: api/AssetEntity/relationships
+    [HttpPost("relationships")]
+    public async Task<ActionResult<Relationship>> CreateRelationship([FromBody] Relationship relationship)
+    {
+        if (relationship == null) return BadRequest();
+        await _service.CreateOrUpdateRelationshipAsync(relationship);
+        return Ok(relationship);
+    }
+
+    // PUT: api/AssetEntity/relationships
+    [HttpPut("relationships")]
+    public async Task<IActionResult> UpdateRelationship([FromBody] Relationship relationship)
+    {
+        if (relationship == null) return BadRequest();
+        await _service.CreateOrUpdateRelationshipAsync(relationship);
         return NoContent();
     }
 }
