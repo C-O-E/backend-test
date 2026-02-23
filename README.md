@@ -101,7 +101,7 @@ You don't need to write code for these either, just explain how you would invest
 
 > *(Your answer)*
 
-**Scenario B**: After deploying to production, you get reports that deleting an entity sometimes causes other, seemingly unrelated entities to "disappear" from the API. What could cause this?
+**Scenario B**: After deploying to production, you get reports that deleting an entity sometimes causes other, seemingly unrelated entities to "disappear" from the API. What could cause this? Same as before, walk through how you would debug this.
 
 > *(Your answer)*
 
