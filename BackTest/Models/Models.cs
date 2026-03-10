@@ -113,7 +113,7 @@ public class AssetOwnership : CommonBase
     public virtual required AssetEntity Entity { get; set; }
     public Guid Asset_Id { get; set; }
     public virtual required Asset Asset { get; set; }
-    public float OwnershipPercentage { get; set; }
+    public decimal OwnershipPercentage { get; set; }
     public DateTime? AcquisitionDate { get; set; }
 }
 

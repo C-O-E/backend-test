@@ -5,7 +5,7 @@ namespace BackTest.Repositories;
 
 public interface IAssetEntityRepository
 {
-    Task<IEnumerable<AssetEntity>> GetAllAsync();
+    Task<IEnumerable<AssetEntity>> GetAllAsync(PaginationParameters pagination, AssetEntityFilterParameters filter);
     Task<AssetEntity?> GetByIdAsync(Guid id);
     Task AddAsync(AssetEntity entity);
     Task UpdateAsync(AssetEntity entity);
@@ -30,14 +30,40 @@ public class AssetEntityRepository : IAssetEntityRepository
         _context = context;
     }
 
-    public async Task<IEnumerable<AssetEntity>> GetAllAsync()
+    // Get all entities with optional composable filtering and pagination
+    public async Task<IEnumerable<AssetEntity>> GetAllAsync(PaginationParameters pagination, AssetEntityFilterParameters filter)
     {
-        return await _context.AssetEntities.ToListAsync();
+        var query = _context.AssetEntities.AsQueryable();
+
+        if (!string.IsNullOrEmpty(filter.EntityType))
+        {
+            query = query.Where(e => e.EntityType == filter.EntityType);
+        }
+
+        if (!string.IsNullOrEmpty(filter.RiskLevel))
+        {
+            query = query.Where(e => e.RiskLevel != null && e.RiskLevel == filter.RiskLevel);
+        }
+
+        if (!string.IsNullOrEmpty(filter.Tag))
+        {
+            query = query.Where(e => e.Tags != null && e.Tags.Contains(filter.Tag));
+        }
+
+        if (pagination.PageSize.HasValue)
+        {
+            query = query
+                .Skip((pagination.Page - 1) * pagination.PageSize.Value)
+                .Take(pagination.PageSize.Value);
+        }
+
+        return await query.ToListAsync();
     }
 
     public async Task<AssetEntity?> GetByIdAsync(Guid id)
     {
-        return await _context.AssetEntities.FindAsync(id);
+        // Use FirstOrDefaultAsync to inherit Global Query Filter of soft-deletion
+        return await _context.AssetEntities.FirstOrDefaultAsync(e => e.Entity_Id == id);
     }
 
     public async Task AddAsync(AssetEntity entity)
@@ -54,7 +80,7 @@ public class AssetEntityRepository : IAssetEntityRepository
 
     public async Task DeleteAsync(Guid id)
     {
-        var entity = await _context.AssetEntities.FindAsync(id);
+        var entity = await _context.AssetEntities.FirstOrDefaultAsync(e => e.Entity_Id == id);
         if (entity != null)
         {
             _context.AssetEntities.Remove(entity);
@@ -70,9 +96,8 @@ public class AssetEntityRepository : IAssetEntityRepository
         for (int i = 0; i < depth; i++)
         {
             var relationships = await _context.Relationships
+                .AsNoTracking()
                 .Where(r => currentDepthEntities.Contains(r.SourceEntity_Id) || currentDepthEntities.Contains(r.TargetEntity_Id))
-                .Include(r => r.SourceEntity)
-                .Include(r => r.TargetEntity)
                 .ToListAsync();
 
             indirectRelationships.AddRange(relationships);
@@ -86,15 +111,15 @@ public class AssetEntityRepository : IAssetEntityRepository
     public async Task<IEnumerable<Relationship>> GetRelationshipsByEntityIdAsync(Guid entityId)
     {
         return await _context.Relationships
+            .AsNoTracking()
             .Where(r => r.SourceEntity_Id == entityId || r.TargetEntity_Id == entityId)
-            .Include(r => r.SourceEntity)
-            .Include(r => r.TargetEntity)
             .ToListAsync();
     }
 
     public async Task<Relationship?> GetRelationshipByIdAsync(Guid relationshipId)
     {
-        return await _context.Relationships.FindAsync(relationshipId);
+        // Use FirstOrDefaultAsync to inherit Global Query Filter of soft-deletion
+        return await _context.Relationships.FirstOrDefaultAsync(r => r.Relationship_Id == relationshipId);
     }
 
     public async Task CreateRelationship(Relationship relationship)
@@ -111,7 +136,7 @@ public class AssetEntityRepository : IAssetEntityRepository
 
     public async Task DeleteRelationship(Guid relationshipId)
     {
-        var relationship = await _context.Relationships.FindAsync(relationshipId);
+        var relationship = await GetRelationshipByIdAsync(relationshipId);
         if (relationship != null)
         {
             _context.Relationships.Remove(relationship);
