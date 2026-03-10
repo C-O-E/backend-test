@@ -1,3 +1,4 @@
+using BackTest.DTOs;
 using BackTest.Models;
 using BackTest.Repositories;
 
@@ -5,13 +6,15 @@ namespace BackTest.Services;
 
 public interface IAssetEntityService
 {
-    Task<IEnumerable<AssetEntity>> GetAllEntitiesAsync();
+    Task<IEnumerable<AssetEntity>> GetAllEntitiesAsync(PaginationParameters pagination, AssetEntityFilterParameters filter);
     Task<AssetEntity?> GetEntityByIdAsync(Guid id);
     Task CreateEntityAsync(AssetEntity entity);
-    Task UpdateEntityAsync(Guid id, AssetEntity updatedEntity);
+    Task UpdateEntityAsync(Guid id, UpdateAssetEntityRequest request);
     Task DeleteEntityAsync(Guid id);
+    Task<Relationship?> GetRelationshipByIdAsync(Guid relationshipId);
     Task<IEnumerable<Relationship>> GetIndirectRelationshipsAsync(Guid entityId, int depth);
     Task CreateOrUpdateRelationshipAsync(Relationship relationship);
+    Task DeleteRelationshipAsync(Guid relationshipId);
 }
 
 public class AssetEntityService : IAssetEntityService
@@ -23,9 +26,9 @@ public class AssetEntityService : IAssetEntityService
         _repository = repository;
     }
 
-    public async Task<IEnumerable<AssetEntity>> GetAllEntitiesAsync()
+    public async Task<IEnumerable<AssetEntity>> GetAllEntitiesAsync(PaginationParameters pagination, AssetEntityFilterParameters filter)
     {
-        return await _repository.GetAllAsync();
+        return await _repository.GetAllAsync(pagination, filter);
     }
 
     public async Task<AssetEntity?> GetEntityByIdAsync(Guid id)
@@ -35,22 +38,26 @@ public class AssetEntityService : IAssetEntityService
 
     public async Task CreateEntityAsync(AssetEntity entity)
     {
+        InitCommonFieldsOfNewEntity(entity);
         await _repository.AddAsync(entity);
     }
 
-    public async Task UpdateEntityAsync(Guid id, AssetEntity updatedEntity)
+    private static void InitCommonFieldsOfNewEntity(AssetEntity entity)
+    {
+        entity.CreatedAt = DateTime.UtcNow;
+        entity.UpdatedAt = null;
+        entity.DeletedAt = null;
+        entity.IsDeleted = false;
+        entity.IsActive = true;
+        entity.IsLocked = false;
+    }
+
+    public async Task UpdateEntityAsync(Guid id, UpdateAssetEntityRequest request)
     {
         var existingEntity = await _repository.GetByIdAsync(id);
         if (existingEntity != null)
         {
-            existingEntity.EntityReference = updatedEntity.EntityReference;
-            existingEntity.PreferredLanguage = updatedEntity.PreferredLanguage;
-            existingEntity.EntityType = updatedEntity.EntityType;
-            existingEntity.RiskLevel = updatedEntity.RiskLevel;
-            existingEntity.Tags = updatedEntity.Tags;
-            existingEntity.UpdatedAt = DateTime.UtcNow;
-            existingEntity.IsUnderReview = updatedEntity.IsUnderReview;
-
+            request.ApplyTo(existingEntity);
             await _repository.UpdateAsync(existingEntity);
         }
     }

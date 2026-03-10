@@ -6,7 +6,10 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers()
+builder.Services.AddControllers(options =>
+    {
+        options.Filters.Add<BackTest.Filters.JsonExceptionFilter>();
+    })
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
@@ -20,7 +23,24 @@ builder.Services.AddScoped<IAssetEntityService, AssetEntityService>();
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.UseOneOfForPolymorphism();
+    options.UseAllOfForInheritance();
+    options.SelectSubTypesUsing(baseType =>
+    {
+        if (baseType == typeof(BackTest.DTOs.CreateAssetEntityRequest))
+            return [typeof(BackTest.DTOs.CreateLegalEntityRequest), typeof(BackTest.DTOs.CreateNaturalEntityRequest)];
+        return [];
+    });
+    options.SelectDiscriminatorNameUsing(_ => "type");
+    options.SelectDiscriminatorValueUsing(subType =>
+    {
+        if (subType == typeof(BackTest.DTOs.CreateLegalEntityRequest))   return "legal";
+        if (subType == typeof(BackTest.DTOs.CreateNaturalEntityRequest)) return "natural";
+        return subType.Name;
+    });
+});
 
 var app = builder.Build();
 
@@ -217,7 +237,7 @@ using (var scope = app.Services.CreateScope())
         Entity = legalEntity1,
         Asset_Id = realEstate1.Asset_Id,
         Asset = realEstate1,
-        OwnershipPercentage = 75.0f,
+        OwnershipPercentage = 75.0m,
         AcquisitionDate = new DateTime(2023, 1, 15),
         Tenant_Id = tenant1Id
     };
@@ -229,7 +249,7 @@ using (var scope = app.Services.CreateScope())
         Entity = legalEntity2,
         Asset_Id = realEstate1.Asset_Id,
         Asset = realEstate1,
-        OwnershipPercentage = 40.0f,
+        OwnershipPercentage = 25.0m,
         AcquisitionDate = new DateTime(2023, 6, 1),
         Tenant_Id = tenant1Id
     };
@@ -248,3 +268,6 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.Run();
+
+// Expose Program class to WebApplicationFactory in tests
+public partial class Program { }

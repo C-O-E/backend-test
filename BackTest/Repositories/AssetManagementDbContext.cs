@@ -70,11 +70,10 @@ public class AssetManagementDbContext : DbContext
             .OnDelete(DeleteBehavior.Restrict);
 
         // Global query filters
-        modelBuilder.Entity<AssetEntity>().HasQueryFilter(e => !e.IsDeleted);
-        // modelBuilder.Entity<Relationship>().HasQueryFilter(r => !r.IsDeleted);
+        modelBuilder.Entity<Relationship>().HasQueryFilter(r => !r.IsDeleted);
 
         // Tenant isolation filter
-        modelBuilder.Entity<AssetEntity>().HasQueryFilter(e => !e.IsDeleted && (e.Tenant_Id == _currentTenantId || _currentTenantId == null));
+        modelBuilder.Entity<AssetEntity>().HasQueryFilter(e => !e.IsDeleted && e.Tenant_Id == _currentTenantId);
 
         // AssetOwnership relationships
         modelBuilder.Entity<AssetOwnership>()
@@ -106,6 +105,8 @@ public class AssetManagementDbContext : DbContext
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
+        PreventModificationOfLockedEntities();
+
         foreach (var entry in ChangeTracker.Entries<CommonBase>())
         {
             switch (entry.State)
@@ -114,7 +115,7 @@ public class AssetManagementDbContext : DbContext
                     entry.State = EntityState.Modified;
                     entry.Entity.IsDeleted = true;
                     entry.Entity.IsActive = false;
-                    entry.Entity.DeletedAt = DateTime.Now;
+                    entry.Entity.DeletedAt = DateTime.UtcNow;
                     break;
 
                 case EntityState.Modified:
@@ -128,8 +129,10 @@ public class AssetManagementDbContext : DbContext
         }
 
         // Audit logging
+        // ToList() snapshots the entries before iteration to avoid "collection modified" errors
         foreach (var entry in ChangeTracker.Entries<CommonBase>()
-            .Where(e => e.State == EntityState.Added || e.State == EntityState.Modified))
+            .Where(e => e.State == EntityState.Added || e.State == EntityState.Modified)
+            .ToList())
         {
             try
             {
@@ -155,8 +158,9 @@ public class AssetManagementDbContext : DbContext
 
     private void PreventModificationOfLockedEntities()
     {
+        // The locked entity should not be modified or accidentally deleted
         var lockedEntities = ChangeTracker.Entries<CommonBase>()
-            .Where(e => e.State == EntityState.Modified && e.Entity.IsLocked);
+            .Where(e => (e.State == EntityState.Modified || e.State == EntityState.Deleted) && e.Entity.IsLocked);
 
         foreach (var entry in lockedEntities)
         {

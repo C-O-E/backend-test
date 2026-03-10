@@ -1,6 +1,8 @@
+using BackTest.DTOs;
 using BackTest.Models;
 using BackTest.Services;
 using Microsoft.AspNetCore.Mvc;
+using BackTest.Errors;
 
 [Route("api/[controller]")]
 [ApiController]
@@ -15,9 +17,11 @@ public class AssetEntityController : ControllerBase
 
     // GET: api/AssetEntity
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<AssetEntity>>> GetAssetEntities()
+    public async Task<ActionResult<IEnumerable<AssetEntity>>> GetAssetEntities(
+        [FromQuery] PaginationParameters pagination,
+        [FromQuery] AssetEntityFilterParameters filter)
     {
-        var assetEntities = await _service.GetAllEntitiesAsync();
+        var assetEntities = await _service.GetAllEntitiesAsync(pagination, filter);
         return Ok(assetEntities);
     }
 
@@ -30,27 +34,39 @@ public class AssetEntityController : ControllerBase
     }
 
     // POST: api/AssetEntity
+    // Requires "type" discriminator in request body: "legal" or "natural".
     [HttpPost]
-    public async Task<ActionResult<AssetEntity>> CreateAssetEntity([FromBody] AssetEntity assetEntity)
+    public async Task<ActionResult<AssetEntity>> CreateAssetEntity([FromBody] CreateAssetEntityRequest request)
     {
-        if (assetEntity == null)
+        if (request == null)
         {
             return BadRequest();
         }
+        // TenantId taken from HttpContext set by TenantResolutionMiddleware — not from request body
+        Guid? tenantId = HttpContext.Items["TenantId"] is Guid id ? id : null;
+        if (tenantId == null)
+        {
+            return BadRequest(new Error { Code = 400, Title = "Bad Request", Detail = "TenantId is required in header" });
+        }
+        
+        var assetEntity = request.ToDomainModel();
+        assetEntity.Tenant_Id = tenantId;
+
         await _service.CreateEntityAsync(assetEntity);
         return CreatedAtAction(nameof(GetAssetEntity), new { id = assetEntity.Entity_Id }, assetEntity);
     }
 
     // PUT: api/AssetEntity/{id}
+    // Sends only the fields to update; null fields are left unchanged.
     [HttpPut("{id}")]
-    public async Task<IActionResult> UpdateAssetEntity(Guid id, [FromBody] AssetEntity updatedEntity)
+    public async Task<IActionResult> UpdateAssetEntity(Guid id, [FromBody] UpdateAssetEntityRequest request)
     {
         var assetEntity = await _service.GetEntityByIdAsync(id);
         if (assetEntity == null)
         {
             return NotFound();
         }
-        await _service.UpdateEntityAsync(id, updatedEntity);
+        await _service.UpdateEntityAsync(id, request);
         return NoContent();
     }
 
@@ -103,4 +119,17 @@ public class AssetEntityController : ControllerBase
         await _service.CreateOrUpdateRelationshipAsync(relationship);
         return NoContent();
     }
+
+    // DELETE: api/AssetEntity/relationships/{relationshipId}
+    [HttpDelete("relationships/{relationshipId}")]
+    public async Task<IActionResult> DeleteRelationship(Guid relationshipId)
+    {
+        var retrievedRelationship = await _service.GetRelationshipByIdAsync(relationshipId);
+        if (retrievedRelationship == null)
+        {
+            return NotFound();
+        }
+        await _service.DeleteRelationshipAsync(relationshipId);
+        return NoContent();
+    }   
 }
